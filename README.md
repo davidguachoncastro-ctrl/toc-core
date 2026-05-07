@@ -1,5 +1,7 @@
 # toc-core
 
+![CI](https://github.com/davidguachoncastro-ctrl/toc-core/actions/workflows/ci.yml/badge.svg)
+
 Núcleo compartido del ecosistema TOC. Reúne la lógica pura que necesitan más
 de una de las apps del ecosistema (TPV, Backoffice, RRHH) para evitar
 duplicación silenciosa entre repos hermanos.
