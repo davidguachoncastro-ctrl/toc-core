@@ -1,0 +1,20 @@
+{
+  "name": "toc-core",
+  "version": "0.1.0",
+  "description": "Núcleo compartido del ecosistema TOC: lógica pura reutilizable entre TPV, Backoffice y RRHH",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "devDependencies": {
+    "happy-dom": "^15.0.0",
+    "vitest": "^2.1.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "author": "David Guachón Castro",
+  "license": "UNLICENSED"
+}
