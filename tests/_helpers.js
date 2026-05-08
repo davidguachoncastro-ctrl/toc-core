@@ -23,6 +23,7 @@ const sourceCode = [
   loadCore('pin-hash.js'),
   loadCore('tenant-resolver.js'),
   loadCore('iva.js'),
+  loadCore('audit-log.js'),
 ].join('\n');
 
 // eslint-disable-next-line no-new-func
@@ -44,6 +45,10 @@ const exposeAll = new Function(`
     precioLineaPuro,
     desglosarIvaLinea,
     calcularDesgloseIva,
+    // audit-log
+    createAuditLog,
+    AUDIT_TIPOS,
+    AUDIT_UMBRAL_DESCUENTO_PCT,
   };
 `);
 
@@ -62,4 +67,7 @@ export const {
   precioLineaPuro,
   desglosarIvaLinea,
   calcularDesgloseIva,
+  createAuditLog,
+  AUDIT_TIPOS,
+  AUDIT_UMBRAL_DESCUENTO_PCT,
 } = core;
