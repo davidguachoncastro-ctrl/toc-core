@@ -22,6 +22,7 @@ function loadCore(filename) {
 const sourceCode = [
   loadCore('pin-hash.js'),
   loadCore('tenant-resolver.js'),
+  loadCore('iva.js'),
 ].join('\n');
 
 // eslint-disable-next-line no-new-func
@@ -38,6 +39,11 @@ const exposeAll = new Function(`
     detectarTenantDesdeUrl,
     nombreLocalDesdeTenant,
     esTenantValido,
+    // iva
+    redondear2,
+    precioLineaPuro,
+    desglosarIvaLinea,
+    calcularDesgloseIva,
   };
 `);
 
@@ -52,4 +58,8 @@ export const {
   detectarTenantDesdeUrl,
   nombreLocalDesdeTenant,
   esTenantValido,
+  redondear2,
+  precioLineaPuro,
+  desglosarIvaLinea,
+  calcularDesgloseIva,
 } = core;
