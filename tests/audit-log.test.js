@@ -96,7 +96,7 @@ describe('Constantes públicas', () => {
     expect(AUDIT_UMBRAL_DESCUENTO_PCT).toBe(10);
   });
 
-  it('AUDIT_TIPOS contiene los 8 tipos acordados', () => {
+  it('AUDIT_TIPOS contiene los 9 tipos acordados', () => {
     expect(AUDIT_TIPOS.ANULACION).toBe('anulacion');
     expect(AUDIT_TIPOS.CANCELACION_CUENTA).toBe('cancelacion_cuenta');
     expect(AUDIT_TIPOS.DESCUENTO_ALTO).toBe('descuento_alto');
@@ -105,6 +105,18 @@ describe('Constantes públicas', () => {
     expect(AUDIT_TIPOS.APERTURA_CAJA).toBe('apertura_caja');
     expect(AUDIT_TIPOS.LOGIN_FALLIDO).toBe('login_fallido');
     expect(AUDIT_TIPOS.EDIT_CARTA).toBe('edit_carta');
+    expect(AUDIT_TIPOS.VENTA_SIN_ESCANDALLO).toBe('venta_sin_escandallo');
+  });
+
+  it('venta_sin_escandallo se acepta como tipo válido en escribir()', async () => {
+    const { deps, mock } = makeDeps();
+    const audit = createAuditLog(deps);
+    await audit.escribir('venta_sin_escandallo', {
+      payload: { producto: 'Café X', qty: 2, ventaId: 'v-1' },
+    });
+    expect(mock.adds).toHaveLength(1);
+    expect(mock.adds[0].data.tipo).toBe('venta_sin_escandallo');
+    expect(mock.adds[0].data.payload.producto).toBe('Café X');
   });
 });
 

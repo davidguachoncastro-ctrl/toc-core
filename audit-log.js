@@ -8,14 +8,17 @@
 // inyectando sus dependencias.
 //
 // Eventos auditables (acordados):
-//   - anulacion          (línea enviada cancelada)
-//   - cancelacion_cuenta (cuenta entera cancelada)
-//   - descuento_alto     (>10% sobre la base)
+//   - anulacion             (línea enviada cancelada)
+//   - cancelacion_cuenta    (cuenta entera cancelada)
+//   - descuento_alto        (>10% sobre la base)
 //   - cierre_z
 //   - cierre_x
 //   - apertura_caja
-//   - login_fallido      (3+ intentos consecutivos del mismo PIN)
-//   - edit_carta         (cambio en producto/precio desde Backoffice)
+//   - login_fallido         (3+ intentos consecutivos del mismo PIN)
+//   - edit_carta            (cambio en producto/precio desde Backoffice)
+//   - venta_sin_escandallo  (cobro de producto sin escandallo en el contrato
+//                            vigente; la venta se cobra normal pero NO se
+//                            descuenta stock — David debe crear el escandallo)
 //
 // Estructura de cada entrada en Firestore:
 // {
@@ -48,6 +51,7 @@ const AUDIT_TIPOS = {
   APERTURA_CAJA: 'apertura_caja',
   LOGIN_FALLIDO: 'login_fallido',
   EDIT_CARTA: 'edit_carta',
+  VENTA_SIN_ESCANDALLO: 'venta_sin_escandallo',
 };
 
 const AUDIT_UMBRAL_DESCUENTO_PCT = 10;
