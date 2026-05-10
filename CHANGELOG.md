@@ -5,6 +5,16 @@ una entrada aquí.
 
 El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
 
+## [Unreleased]
+
+### Used
+
+- TIPO `venta_sin_escandallo` (commit `4b680ea`) en uso productivo
+  por TPV en sandbox (`toc-tpv-sandbox`). Validado el 10/5/2026 al
+  cobrar producto sin escandallo embebido en el contrato vigente:
+  el cobro completa caja, NO escribe `stock-movimientos`, y emite
+  `venta_sin_escandallo` en `audit_log` con `{producto, qty, ventaId}`.
+
 ## [Unreleased] — Arq 2 · audit-log.js (Factory DI)
 
 **Fecha:** 9 mayo 2026.
