@@ -5,6 +5,56 @@ una entrada aquí.
 
 El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
 
+## [Unreleased] — tenant-resolver: fix subdominio Firebase + defaultTenant configurable
+
+**Fecha:** 11-12 mayo 2026.
+
+Dos cambios consecutivos en `tenant-resolver.js` motivados por un
+debug del TPV en móvil (la URL corta del sandbox caía silenciosamente
+al tenant default y la app sandbox apuntaba al Firebase de producción)
+y por la posterior migración del Backoffice a este módulo.
+
+### Fixed
+
+- **`tenant-resolver.js`** (commit `b2071b9`) — la rama de detección
+  por subdominio asumía hosts cortos (`pamplona.theoldcoffee.es`) y
+  prefijaba `toc-tpv-` siempre. Con hosts Firebase tipo
+  `toc-tpv-sandbox.web.app` el sub ya venía prefijado y la
+  concatenación generaba el candidato inválido
+  `toc-tpv-toc-tpv-sandbox`, descartado por
+  `TENANTS_VALIDOS.includes(...)` → fallback al default. Fix:
+  ```js
+  const candidato = sub.startsWith('toc-tpv-') ? sub : `toc-tpv-${sub}`;
+  ```
+  Misma defensa que ya existía en la rama de query.
+
+### Added
+
+- **`tenant-resolver.js`** (commit `4e5102a`) — tercer parámetro
+  opcional `defaultTenant` en `detectarTenantDesdeUrl(hostname, search,
+  defaultTenant = TENANT_DEFAULT)`. Permite que cada consumidor declare
+  su propio fallback sin que el módulo se entere de quién lo llama:
+  - TPV no pasa el parámetro → sigue usando `'toc-tpv-pamplona'` (compat
+    total).
+  - BO pasa `'toc-tpv-sandbox'` → no cae accidentalmente a producción
+    cuando el resolver no resuelve.
+- **`tests/tenant-resolver.test.js`** — 6 tests nuevos: subdominio
+  Firebase con sub prefijado (`toc-tpv-sandbox.web.app`,
+  `toc-tpv-pamplona.web.app`), subdominio Firebase desconocido, y
+  4 tests del nuevo parámetro `defaultTenant` (uso, no-override de
+  query/subdominio cuando sí resuelven, compat sin pasar el
+  argumento). 27/27 verdes en este archivo, 87/87 totales.
+
+### Consumidores
+- **TPV** (`toc-tpv@5f05dbf`): bump al commit `4e5102a`. Sin cambios
+  en su adapter `js/tenant.js` — no usa el nuevo parámetro.
+- **BO** (`toc-backoffice@0619d3c`): bump al commit `4e5102a` +
+  migración completa. Antes el BO tenía su propio `js/tenant.js` con
+  la lógica duplicada (y el mismo bug del subdominio). Ahora consume
+  `toc-core/tenant-resolver.js` vía adapter que pasa
+  `'toc-tpv-sandbox'` como `defaultTenant`. Drift de lógica duplicada
+  eliminado.
+
 ## [Unreleased]
 
 ### Used
