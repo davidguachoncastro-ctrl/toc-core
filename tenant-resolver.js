@@ -37,7 +37,9 @@ function detectarTenantDesdeUrl(hostname, search) {
     const parts = hostname.split('.');
     if (parts.length >= 3) {
       const sub = parts[0];
-      const candidato = `toc-tpv-${sub}`;
+      // Acepta tanto subdominios cortos (`pamplona.theoldcoffee.es`)
+      // como hosts Firebase con sub prefijado (`toc-tpv-sandbox.web.app`).
+      const candidato = sub.startsWith('toc-tpv-') ? sub : `toc-tpv-${sub}`;
       if (TENANTS_VALIDOS.includes(candidato)) {
         return candidato;
       }
