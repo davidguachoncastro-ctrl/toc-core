@@ -11,13 +11,17 @@ const TENANTS_VALIDOS = ['toc-tpv-pamplona', 'toc-tpv-iturrama', 'toc-tpv-sandbo
 
 /**
  * Detecta el tenant a partir de una URL.
- * Prioridad: query string > subdominio > default.
+ * Prioridad: query string > subdominio > defaultTenant.
  *
  * @param {string} hostname - Por ej. 'pamplona.theoldcoffee.es'
  * @param {string} search - Query string, por ej. '?tenant=iturrama'
+ * @param {string} [defaultTenant=TENANT_DEFAULT] - Fallback cuando ni query ni
+ *   subdominio resuelven. Por defecto `TENANT_DEFAULT` ('toc-tpv-pamplona') para
+ *   compatibilidad con el TPV; el Backoffice y otros consumidores pasan el suyo
+ *   (p.ej. 'toc-tpv-sandbox') para no caer accidentalmente a producción.
  * @returns {string} Tenant ID válido (siempre devuelve uno)
  */
-function detectarTenantDesdeUrl(hostname, search) {
+function detectarTenantDesdeUrl(hostname, search, defaultTenant = TENANT_DEFAULT) {
   // 1. Query string (mayor prioridad)
   try {
     const params = new URLSearchParams(search || '');
@@ -46,8 +50,8 @@ function detectarTenantDesdeUrl(hostname, search) {
     }
   }
 
-  // 3. Default
-  return TENANT_DEFAULT;
+  // 3. Default (parametrizable por consumidor)
+  return defaultTenant;
 }
 
 /**

@@ -61,6 +61,17 @@ describe('detectarTenantDesdeUrl — subdominio', () => {
   it('IP local (127.0.0.1) → default', () => {
     expect(detectarTenantDesdeUrl('127.0.0.1', '')).toBe(TENANT_DEFAULT);
   });
+
+  it('host Firebase con sub prefijado (toc-tpv-sandbox.web.app) → toc-tpv-sandbox', () => {
+    // Caso que rompía antes de mayo 2026: el resolver concatenaba `toc-tpv-`
+    // a un sub que ya venía prefijado y caía silenciosamente al default.
+    expect(detectarTenantDesdeUrl('toc-tpv-sandbox.web.app', '')).toBe('toc-tpv-sandbox');
+    expect(detectarTenantDesdeUrl('toc-tpv-pamplona.web.app', '')).toBe('toc-tpv-pamplona');
+  });
+
+  it('host Firebase con sub prefijado pero tenant desconocido → default', () => {
+    expect(detectarTenantDesdeUrl('toc-tpv-madrid.web.app', '')).toBe(TENANT_DEFAULT);
+  });
 });
 
 describe('detectarTenantDesdeUrl — prioridad', () => {
@@ -103,6 +114,28 @@ describe('esTenantValido', () => {
     expect(esTenantValido('toc-tpv-madrid')).toBe(false);
     expect(esTenantValido('foo-bar')).toBe(false);
     expect(esTenantValido('')).toBe(false);
+  });
+});
+
+describe('detectarTenantDesdeUrl — defaultTenant parametrizable', () => {
+  it('sin defaultTenant explícito usa TENANT_DEFAULT (compat con TPV)', () => {
+    expect(detectarTenantDesdeUrl('localhost', '')).toBe(TENANT_DEFAULT);
+    expect(detectarTenantDesdeUrl('localhost', '')).toBe('toc-tpv-pamplona');
+  });
+
+  it('respeta el defaultTenant del consumidor cuando ni query ni subdominio resuelven', () => {
+    expect(detectarTenantDesdeUrl('localhost', '', 'toc-tpv-sandbox')).toBe('toc-tpv-sandbox');
+    expect(detectarTenantDesdeUrl('', '', 'toc-tpv-sandbox')).toBe('toc-tpv-sandbox');
+  });
+
+  it('defaultTenant NO sobreescribe una resolución exitosa por query', () => {
+    expect(detectarTenantDesdeUrl('localhost', '?tenant=iturrama', 'toc-tpv-sandbox'))
+      .toBe('toc-tpv-iturrama');
+  });
+
+  it('defaultTenant NO sobreescribe una resolución exitosa por subdominio', () => {
+    expect(detectarTenantDesdeUrl('pamplona.theoldcoffee.es', '', 'toc-tpv-sandbox'))
+      .toBe('toc-tpv-pamplona');
   });
 });
 
