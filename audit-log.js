@@ -52,6 +52,7 @@ const AUDIT_TIPOS = {
   LOGIN_FALLIDO: 'login_fallido',
   EDIT_CARTA: 'edit_carta',
   VENTA_SIN_ESCANDALLO: 'venta_sin_escandallo',
+  CAJON_MANUAL: 'cajon_manual',
 };
 
 const AUDIT_UMBRAL_DESCUENTO_PCT = 10;

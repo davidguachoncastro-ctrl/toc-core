@@ -96,7 +96,7 @@ describe('Constantes públicas', () => {
     expect(AUDIT_UMBRAL_DESCUENTO_PCT).toBe(10);
   });
 
-  it('AUDIT_TIPOS contiene los 9 tipos acordados', () => {
+  it('AUDIT_TIPOS contiene los 10 tipos acordados', () => {
     expect(AUDIT_TIPOS.ANULACION).toBe('anulacion');
     expect(AUDIT_TIPOS.CANCELACION_CUENTA).toBe('cancelacion_cuenta');
     expect(AUDIT_TIPOS.DESCUENTO_ALTO).toBe('descuento_alto');
@@ -106,6 +106,7 @@ describe('Constantes públicas', () => {
     expect(AUDIT_TIPOS.LOGIN_FALLIDO).toBe('login_fallido');
     expect(AUDIT_TIPOS.EDIT_CARTA).toBe('edit_carta');
     expect(AUDIT_TIPOS.VENTA_SIN_ESCANDALLO).toBe('venta_sin_escandallo');
+    expect(AUDIT_TIPOS.CAJON_MANUAL).toBe('cajon_manual');
   });
 
   it('venta_sin_escandallo se acepta como tipo válido en escribir()', async () => {
@@ -117,6 +118,19 @@ describe('Constantes públicas', () => {
     expect(mock.adds).toHaveLength(1);
     expect(mock.adds[0].data.tipo).toBe('venta_sin_escandallo');
     expect(mock.adds[0].data.payload.producto).toBe('Café X');
+  });
+
+  it('cajon_manual se acepta como tipo válido en escribir()', async () => {
+    const { deps, mock } = makeDeps();
+    const audit = createAuditLog(deps);
+    await audit.escribir('cajon_manual', {
+      motivo: 'Cambio para mesa 4',
+      payload: { mesa: 4 },
+    });
+    expect(mock.adds).toHaveLength(1);
+    expect(mock.adds[0].data.tipo).toBe('cajon_manual');
+    expect(mock.adds[0].data.motivo).toBe('Cambio para mesa 4');
+    expect(mock.adds[0].data.payload.mesa).toBe(4);
   });
 });
 
