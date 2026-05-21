@@ -9,6 +9,9 @@
 //
 // Eventos auditables (acordados):
 //   - anulacion             (línea enviada cancelada)
+//   - anulacion_venta       (venta cobrada anulada a posteriori,
+//                            append-only — sustituye al update mutable
+//                            previo a Bloque 2)
 //   - cancelacion_cuenta    (cuenta entera cancelada)
 //   - descuento_alto        (>10% sobre la base)
 //   - cierre_z
@@ -44,6 +47,7 @@
 
 const AUDIT_TIPOS = {
   ANULACION: 'anulacion',
+  ANULACION_VENTA: 'anulacion_venta',
   CANCELACION_CUENTA: 'cancelacion_cuenta',
   DESCUENTO_ALTO: 'descuento_alto',
   CIERRE_Z: 'cierre_z',

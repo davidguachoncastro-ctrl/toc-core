@@ -96,8 +96,9 @@ describe('Constantes públicas', () => {
     expect(AUDIT_UMBRAL_DESCUENTO_PCT).toBe(10);
   });
 
-  it('AUDIT_TIPOS contiene los 10 tipos acordados', () => {
+  it('AUDIT_TIPOS contiene los 11 tipos acordados', () => {
     expect(AUDIT_TIPOS.ANULACION).toBe('anulacion');
+    expect(AUDIT_TIPOS.ANULACION_VENTA).toBe('anulacion_venta');
     expect(AUDIT_TIPOS.CANCELACION_CUENTA).toBe('cancelacion_cuenta');
     expect(AUDIT_TIPOS.DESCUENTO_ALTO).toBe('descuento_alto');
     expect(AUDIT_TIPOS.CIERRE_Z).toBe('cierre_z');
