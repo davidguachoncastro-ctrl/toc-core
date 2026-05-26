@@ -46,6 +46,7 @@
 // ═══════════════════════════════════════════════════════════════════
 
 const AUDIT_TIPOS = {
+  VENTA: 'venta',
   ANULACION: 'anulacion',
   ANULACION_VENTA: 'anulacion_venta',
   CANCELACION_CUENTA: 'cancelacion_cuenta',
