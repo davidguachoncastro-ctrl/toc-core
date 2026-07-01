@@ -5,6 +5,37 @@ una entrada aquí.
 
 El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
 
+## [Unreleased] — iva: IVA 0% exento + desglose TBAI-safe (#55/#72), tenant-resolver header (#85)
+
+**Fecha:** 1 julio 2026. 93 tests verdes (+5 en `iva.test.js`).
+🟨 EN VALIDACIÓN (lógica pura; OK de David pendiente). #72 pasado por Codex
+adversarial (sin fallos en el largest-remainder).
+
+### Fixed
+
+- **`iva.js` — #55: IVA 0% (exento) preservado.** `calcularDesgloseIva` resuelve
+  el tipo con `Number.isFinite(l.iva) ? l.iva : 10` en vez de `l.iva || 10`:
+  un producto exento (iva:0) ya no se declara como 10%; el IVA ausente sigue a 10%.
+- **`iva.js` — #72: desglose sin descuadre de céntimo.** Reparto del total en
+  céntimos por tipo con **largest-remainder** (suelo + céntimo sobrante al mayor
+  resto; empates por orden de aparición) y `base = total − cuota` por tramo →
+  `Σ base + Σ cuota == total` EXACTO. Elimina el ±0,01 € que TBAI/VeriFactu
+  rechazan cuando se redondeaba cada tramo por separado con descuento prorrateado.
+  Reproduce el resultado anterior en los casos sin descuadre.
+
+### Docs
+
+- **`tenant-resolver.js` — #85:** header corregido (decía `js/core/tenant-detect.js`)
+  y marcado como **fuente canónica** de `TENANTS_VALIDOS`. Verificado que no hay
+  copia paralela; `js/tenant.js` del TPV la re-exporta.
+
+### Conocido (fuera de scope, registrado en la auditoría del TPV)
+
+- **#91:** `redondear2` (`Math.round(num*100)/100`) redondea a la baja los
+  half-cent no representables en float (`1.005 → 1.00`). Preexistente y sistémico
+  (afecta a todo redondeo monetario, no solo #72). Detectado por Codex al revisar
+  #72; se ataca aparte con re-corrida completa de tests.
+
 ## [Unreleased] — tenant-resolver: fix subdominio Firebase + defaultTenant configurable
 
 **Fecha:** 11-12 mayo 2026.

@@ -202,3 +202,73 @@ describe('calcularDesgloseIva — con descuento (prorrateo proporcional)', () =>
     expect(r.cuotaIva).toBe(0.18);
   });
 });
+
+describe('calcularDesgloseIva — IVA 0% exento vs ausente (#55)', () => {
+  it('una línea con iva:0 se trata como EXENTO (base = total, cuota 0), no como 10%', () => {
+    const lineas = [{ p: 2, qty: 1, iva: 0 }];
+    const r = calcularDesgloseIva(lineas);
+    expect(r.total).toBe(2);
+    expect(r.desglose[0]).toBeDefined();
+    expect(r.desglose[10]).toBeUndefined();
+    expect(r.desglose[0].base).toBe(2);
+    expect(r.desglose[0].cuota).toBe(0);
+    expect(r.baseImponible).toBe(2);
+    expect(r.cuotaIva).toBe(0);
+  });
+
+  it('el IVA AUSENTE sigue cayendo al 10% por defecto (no confundir con exento)', () => {
+    const lineas = [{ p: 2, qty: 1 }]; // sin campo iva → 10
+    const r = calcularDesgloseIva(lineas);
+    expect(r.desglose[10]).toBeDefined();
+    expect(r.desglose[0]).toBeUndefined();
+    expect(r.cuotaIva).toBeGreaterThan(0);
+  });
+
+  it('mezcla exento (0%) + hostelería (10%): cada tramo con su cuota correcta', () => {
+    const lineas = [
+      { p: 2, qty: 1, iva: 0 },   // bono/exento
+      { p: 1.5, qty: 1, iva: 10 }, // café
+    ];
+    const r = calcularDesgloseIva(lineas);
+    expect(r.total).toBe(3.5);
+    expect(r.desglose[0].cuota).toBe(0);
+    expect(r.desglose[0].base).toBe(2);
+    expect(r.desglose[10].total).toBe(1.5);
+    expect(r.desglose[10].cuota).toBe(0.14);
+    // El global cuadra pese al tramo exento.
+    expect(r.baseImponible + r.cuotaIva).toBe(3.5);
+  });
+});
+
+describe('calcularDesgloseIva — sin descuadre de céntimo (#72, largest-remainder)', () => {
+  it('3 tipos con descuento: Σ base + Σ cuota == total EXACTO (no ±0,01)', () => {
+    // Caso que descuadraba con redondeo por tramo independiente: factor
+    // 2,5/3 reparte 0,8333 € a cada tramo; redondear cada uno a 0,83 daba
+    // Σ = 2,49 ≠ 2,50. Largest-remainder asigna el céntimo sobrante.
+    const lineas = [
+      { p: 1, qty: 1, iva: 4 },
+      { p: 1, qty: 1, iva: 10 },
+      { p: 1, qty: 1, iva: 21 },
+    ];
+    const r = calcularDesgloseIva(lineas, 0.5);
+    expect(r.total).toBe(2.5);
+    const sumaTotales =
+      r.desglose[4].total + r.desglose[10].total + r.desglose[21].total;
+    expect(redondear2(sumaTotales)).toBe(2.5);
+    // Invariante TBAI: base + cuota reconstruyen el total exactamente.
+    expect(r.baseImponible + r.cuotaIva).toBe(2.5);
+  });
+
+  it('cada tramo cumple base + cuota == total del tramo (por construcción)', () => {
+    const lineas = [
+      { p: 3.33, qty: 1, iva: 10 },
+      { p: 6.67, qty: 1, iva: 21 },
+      { p: 2.5, qty: 1, iva: 4 },
+    ];
+    const r = calcularDesgloseIva(lineas, 1.23);
+    Object.values(r.desglose).forEach((d) => {
+      expect(redondear2(d.base + d.cuota)).toBe(d.total);
+    });
+    expect(r.baseImponible + r.cuotaIva).toBe(r.total);
+  });
+});

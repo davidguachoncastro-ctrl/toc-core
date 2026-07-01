@@ -1,6 +1,11 @@
 // ═══════════════════════════════════════════════════════════════════
-// js/core/tenant-detect.js — Lógica pura de detección de tenant
+// toc-core/tenant-resolver.js — Lógica pura de detección de tenant
 // ═══════════════════════════════════════════════════════════════════
+//
+// FUENTE CANÓNICA de `TENANTS_VALIDOS` para todo el ecosistema (#85).
+// No hay copia paralela: `js/tenant.js` la re-exporta como
+// `window.TOC_TENANTS_VALIDOS`; el BO consume este mismo módulo.
+// Añadir un tenant nuevo se hace SOLO aquí.
 //
 // Función pura testeable. Recibe URL y devuelve tenant.
 // El archivo js/tenant.js usa esto al cargarse en el navegador.

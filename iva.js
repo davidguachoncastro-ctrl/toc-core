@@ -70,25 +70,57 @@ function calcularDesgloseIva(lineas, descuento = 0) {
     ? (totalBruto - descuento) / totalBruto
     : 1;
 
-  // Segunda pasada: acumular base/cuota/total por tipo, con el factor.
+  // Segunda pasada: acumular el total (con IVA, con factor) por tipo SIN
+  // redondear todavía. `tipo` con Number.isFinite (#55): un IVA 0 % (exento)
+  // se preserva como 0; solo el IVA AUSENTE cae al 10 % por defecto. El
+  // viejo `l.iva || 10` fosilizaba los exentos como 10 %.
+  const totalFloatPorTipo = {};
+  const ordenTipos = [];
   lineas.forEach((l) => {
-    const tipo = l.iva || 10;
-    const lineaTotal = precioLineaPuro(l) * factor;
-
-    if (!desglose[tipo]) {
-      desglose[tipo] = { base: 0, cuota: 0, total: 0 };
+    const tipo = Number.isFinite(l.iva) ? l.iva : 10;
+    if (!(tipo in totalFloatPorTipo)) {
+      totalFloatPorTipo[tipo] = 0;
+      ordenTipos.push(tipo);
     }
-
-    const lineaBase = lineaTotal / (1 + tipo / 100);
-    desglose[tipo].total += lineaTotal;
-    desglose[tipo].base += lineaBase;
-    desglose[tipo].cuota += lineaTotal - lineaBase;
+    totalFloatPorTipo[tipo] += precioLineaPuro(l) * factor;
   });
 
-  Object.keys(desglose).forEach((tipo) => {
-    desglose[tipo].base = redondear2(desglose[tipo].base);
-    desglose[tipo].cuota = redondear2(desglose[tipo].cuota);
-    desglose[tipo].total = redondear2(desglose[tipo].total);
+  // Total global autoritativo (lo que se cobra) redondeado a céntimos.
+  const totalGlobal = redondear2(totalBruto * factor);
+
+  // #72: reparto largest-remainder del total en céntimos por tipo, de modo
+  // que Σ total[tipo] == totalGlobal EXACTO. Redondear cada tramo por
+  // separado dejaba un descuadre de ±0,01 € entre Σ(base+cuota) y el total
+  // que TBAI/VeriFactu rechaza. Repartimos primero el suelo en céntimos y
+  // luego el céntimo sobrante a los tramos con mayor resto fraccionario.
+  const centGlobal = Math.round(totalGlobal * 100);
+  const tramos = ordenTipos.map((tipo) => {
+    const centExacto = totalFloatPorTipo[tipo] * 100;
+    const piso = Math.floor(centExacto);
+    return { tipo, cent: piso, resto: centExacto - piso };
+  });
+  let sobrante = centGlobal - tramos.reduce((acc, t) => acc + t.cent, 0);
+  // Índices ordenados por resto descendente (estable: empates conservan el
+  // orden de aparición). Repartimos/quitamos céntimos sin reordenar `tramos`
+  // para no alterar el orden de las claves del desglose.
+  const porResto = tramos.map((_, i) => i).sort((a, b) => tramos[b].resto - tramos[a].resto);
+  for (let k = 0; sobrante > 0 && k < porResto.length; k++, sobrante--) {
+    tramos[porResto[k]].cent += 1;
+  }
+  for (let k = porResto.length - 1; sobrante < 0 && k >= 0; k--, sobrante++) {
+    tramos[porResto[k]].cent -= 1;
+  }
+
+  // De total por tipo (ya cuadrado) derivamos cuota y base = total − cuota,
+  // así base + cuota == total por tipo de forma exacta.
+  tramos.forEach(({ tipo, cent }) => {
+    const totalTipo = cent / 100;
+    const cuota = redondear2(totalTipo - totalTipo / (1 + Number(tipo) / 100));
+    desglose[tipo] = {
+      base: redondear2(totalTipo - cuota),
+      cuota,
+      total: totalTipo,
+    };
   });
 
   const baseImponible = redondear2(
@@ -102,6 +134,6 @@ function calcularDesgloseIva(lineas, descuento = 0) {
     desglose,
     baseImponible,
     cuotaIva,
-    total: redondear2(totalBruto * factor),
+    total: totalGlobal,
   };
 }
