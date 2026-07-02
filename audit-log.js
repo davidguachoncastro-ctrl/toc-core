@@ -71,6 +71,17 @@ const AUDIT_UMBRAL_DESCUENTO_PCT = 10;
  * @param {() => Object|null} deps.getUsuario - Getter usuario actual. {id, nombre, rol, ...} o null.
  * @param {() => string} deps.appName         - Getter nombre de app ('tpv', 'backoffice', ...).
  * @param {(...args) => void} deps.log        - Logger (tocLog, console.log, ...).
+ * @param {(...args) => void} [deps.logError] - Logger de ERRORES siempre visible (tocError,
+ *                                              console.error). #54: los fallos de escritura no
+ *                                              pueden depender de ?debug=1. Fallback: deps.log.
+ * @param {() => Object|null} [deps.getAuth]  - Getter identidad Firebase Auth {uid, email}. #54:
+ *                                              el `usuario` PIN es declarativo (falsificable);
+ *                                              `auth` ancla la entrada a la sesión real.
+ * @param {(entrada) => void} [deps.encolar]  - Hook de durabilidad. #54: si Firestore no está
+ *                                              disponible o el write falla, la entrada se entrega
+ *                                              aquí (cola offline del consumidor) en vez de
+ *                                              perderse. Política: mejor duplicado que perdido —
+ *                                              audit_log es append-only y deduplicable a posteriori.
  * @param {Object} [deps.sentry]              - Hooks Sentry (opcional).
  * @param {(msg, cat, data) => void} [deps.sentry.breadcrumb]
  * @param {(err, ctx) => void} [deps.sentry.reportar]
@@ -92,6 +103,9 @@ function createAuditLog(deps) {
   }
 
   const sentry = deps.sentry || {};
+  // #54: errores siempre ruidosos; fallback al logger normal si el
+  // consumidor no inyecta uno dedicado (compat BO/RRHH sin cambios).
+  const logError = typeof deps.logError === 'function' ? deps.logError : deps.log;
 
   /**
    * Escribe una entrada en el audit log. NO bloqueante: si Firebase
@@ -110,6 +124,17 @@ function createAuditLog(deps) {
     }
 
     const usuario = deps.getUsuario();
+    // #54: identidad Firebase Auth real de la sesión (uid/email), además
+    // del `usuario` PIN declarativo. Ancla la entrada a quién estaba
+    // autenticado de verdad; null si el consumidor no la inyecta o no
+    // hay sesión (offline pre-auth).
+    let auth = null;
+    if (typeof deps.getAuth === 'function') {
+      try {
+        const a = deps.getAuth();
+        auth = { uid: (a && a.uid) || null, email: (a && a.email) || null };
+      } catch (_) { auth = null; }
+    }
     const entrada = {
       tipo,
       timestamp: Date.now(),
@@ -120,6 +145,7 @@ function createAuditLog(deps) {
         nombre: (usuario && usuario.nombre) || '-',
         rol: (usuario && usuario.rol) || '-',
       },
+      auth,
       ...datos,
     };
 
@@ -127,9 +153,21 @@ function createAuditLog(deps) {
       try { sentry.breadcrumb('audit: ' + tipo, 'audit', entrada); } catch (_) { /* swallow */ }
     }
 
+    // #54: durabilidad. Sin db (offline/pre-init) el evento ya NO se
+    // pierde: se entrega al hook de cola del consumidor para replay.
     const db = deps.db();
     if (!db) {
-      deps.log('[AUDIT] Firebase no disponible, evento perdido:', tipo);
+      if (typeof deps.encolar === 'function') {
+        try {
+          deps.encolar(entrada);
+          deps.log('[AUDIT] Firebase no disponible, evento ENCOLADO:', tipo);
+          return;
+        } catch (eq) {
+          logError('[AUDIT] ✗ Encolar falló, evento PERDIDO:', tipo, eq);
+          return;
+        }
+      }
+      logError('[AUDIT] ✗ Firebase no disponible, evento PERDIDO:', tipo);
       return;
     }
 
@@ -144,9 +182,19 @@ function createAuditLog(deps) {
         });
       deps.log('[AUDIT] ✓ ' + tipo, datos);
     } catch (e) {
-      deps.log('[AUDIT] Error guardando:', e);
+      // #54: fallo de write ruidoso SIEMPRE (antes solo tocLog con
+      // ?debug=1) + encolado para replay. Política "mejor duplicado que
+      // perdido": si el write llegó al server pero el ack se perdió, el
+      // replay puede duplicar — audit_log es append-only y deduplicable;
+      // un evento fiscal perdido no se recupera.
+      logError('[AUDIT] ✗ Error guardando (se encola para replay):', tipo, e);
       if (typeof sentry.reportar === 'function') {
         try { sentry.reportar(e, { audit_tipo: tipo, audit_datos: datos }); } catch (_) { /* swallow */ }
+      }
+      if (typeof deps.encolar === 'function') {
+        try { deps.encolar(entrada); } catch (eq) {
+          logError('[AUDIT] ✗ Encolar falló, evento PERDIDO:', tipo, eq);
+        }
       }
     }
   }
@@ -193,6 +241,24 @@ function createAuditLog(deps) {
             && r.usuario.nombre.toLowerCase().includes(u)
         );
       }
+
+      // #54: reordenar por _serverTs (hora del SERVIDOR) en cliente. La
+      // query mantiene orderBy('timestamp') — Firestore exige que el
+      // primer orderBy coincida con el campo de los filtros de rango
+      // desde/hasta, y cambiarlo exigiría índices compuestos no
+      // desplegados. El timestamp cliente sigue decidiendo QUÉ entra en
+      // la ventana; el orden final autoritativo es del servidor (un reloj
+      // adelantado ya no cuela su entrada como "la última"). Fallback a
+      // timestamp para entradas replayed cuyo _serverTs sea posterior al
+      // evento o docs sin él.
+      const tsServer = (r) => {
+        const st = r && r._serverTs;
+        if (st && typeof st.toMillis === 'function') {
+          try { return st.toMillis(); } catch (_) { /* cae a timestamp */ }
+        }
+        return (r && r.timestamp) || 0;
+      };
+      resultados.sort((a, b) => tsServer(b) - tsServer(a));
 
       return resultados;
     } catch (e) {

@@ -317,8 +317,10 @@ describe('consultar()', () => {
 
     const out = await audit.consultar();
     expect(out).toHaveLength(2);
-    expect(out[0]._id).toBe('a');
-    expect(out[1]._id).toBe('b');
+    // #54: consultar reordena desc por _serverTs (fallback timestamp) —
+    // el mock devuelve en orden de inserción; el contrato ya no.
+    expect(out[0]._id).toBe('b');
+    expect(out[1]._id).toBe('a');
   });
 
   it('filtra por usuario (substring case-insensitive del nombre)', async () => {
@@ -389,5 +391,134 @@ describe('consultar()', () => {
     await expect(audit.consultar()).resolves.toEqual([]);
     expect(sentryCalls.reportar).toHaveLength(1);
     expect(sentryCalls.reportar[0].ctx.contexto).toBe('auditLogConsultar');
+  });
+});
+
+// ─── #54: endurecimiento fiscal (logError + auth + encolar + orden server) ──
+
+describe('#54 — fallos ruidosos (logError)', () => {
+  it('write fallido llama a logError (visible sin ?debug=1), no solo a log', async () => {
+    const errores = [];
+    const failingDb = {
+      collection: () => ({
+        doc: () => ({
+          collection: () => ({ add: () => Promise.reject(new Error('rules deny')) }),
+        }),
+      }),
+    };
+    const { deps, sentryCalls } = makeDeps({
+      db: () => failingDb,
+      logError: (...args) => errores.push(args),
+    });
+    const audit = createAuditLog(deps);
+    await audit.escribir('cierre_z', { importe: 100 });
+    expect(errores).toHaveLength(1);
+    expect(errores[0].join(' ')).toMatch(/Error guardando/);
+    expect(sentryCalls.reportar).toHaveLength(1);
+  });
+
+  it('sin logError inyectado cae a deps.log sin lanzar (compat BO/RRHH)', async () => {
+    const { deps, logs } = makeDeps({ db: () => null });
+    const audit = createAuditLog(deps);
+    await audit.escribir('cierre_z', {});
+    expect(logs.some(l => l.join(' ').includes('PERDIDO'))).toBe(true);
+  });
+});
+
+describe('#54 — identidad Firebase Auth (getAuth)', () => {
+  it('entrada.auth = {uid, email} cuando getAuth está inyectado', async () => {
+    const { deps, mock } = makeDeps({
+      getAuth: () => ({ uid: 'uid-123', email: 'david@toc.es' }),
+    });
+    const audit = createAuditLog(deps);
+    await audit.escribir('venta', { importe: 10 });
+    expect(mock.adds[0].data.auth).toEqual({ uid: 'uid-123', email: 'david@toc.es' });
+  });
+
+  it('sin getAuth (BO/RRHH sin migrar): auth = null, shape estable', async () => {
+    const { deps, mock } = makeDeps();
+    const audit = createAuditLog(deps);
+    await audit.escribir('venta', {});
+    expect(mock.adds[0].data.auth).toBeNull();
+  });
+
+  it('getAuth que lanza no rompe la escritura (auth null)', async () => {
+    const { deps, mock } = makeDeps({ getAuth: () => { throw new Error('boom'); } });
+    const audit = createAuditLog(deps);
+    await audit.escribir('venta', {});
+    expect(mock.adds).toHaveLength(1);
+    expect(mock.adds[0].data.auth).toBeNull();
+  });
+});
+
+describe('#54 — durabilidad (encolar)', () => {
+  it('db null → la entrada completa se ENCOLA en vez de perderse', async () => {
+    const encolados = [];
+    const { deps } = makeDeps({ db: () => null, encolar: (e) => encolados.push(e) });
+    const audit = createAuditLog(deps);
+    await audit.escribir('anulacion_venta', { payload: { ventaId: 'V1' } });
+    expect(encolados).toHaveLength(1);
+    expect(encolados[0].tipo).toBe('anulacion_venta');
+    expect(encolados[0].payload.ventaId).toBe('V1');
+    expect(encolados[0].timestamp).toBeTypeOf('number');
+  });
+
+  it('write fallido → sentry + encolar para replay', async () => {
+    const encolados = [];
+    const failingDb = {
+      collection: () => ({
+        doc: () => ({
+          collection: () => ({ add: () => Promise.reject(new Error('offline')) }),
+        }),
+      }),
+    };
+    const { deps, sentryCalls } = makeDeps({
+      db: () => failingDb,
+      encolar: (e) => encolados.push(e),
+    });
+    const audit = createAuditLog(deps);
+    await audit.escribir('cierre_z', { importe: 50 });
+    expect(encolados).toHaveLength(1);
+    expect(encolados[0].tipo).toBe('cierre_z');
+    expect(sentryCalls.reportar).toHaveLength(1);
+  });
+
+  it('encolar que lanza degrada a evento perdido con logError, sin excepción', async () => {
+    const errores = [];
+    const { deps } = makeDeps({
+      db: () => null,
+      encolar: () => { throw new Error('quota'); },
+      logError: (...args) => errores.push(args),
+    });
+    const audit = createAuditLog(deps);
+    await expect(audit.escribir('venta', {})).resolves.toBeUndefined();
+    expect(errores.some(l => l.join(' ').includes('PERDIDO'))).toBe(true);
+  });
+});
+
+describe('#54 — consultar ordena por _serverTs (hora servidor)', () => {
+  it('reordena por _serverTs desc aunque el timestamp cliente diga otra cosa', async () => {
+    const { deps, mock } = makeDeps();
+    mock.setDocs([
+      // Reloj cliente ADELANTADO: timestamp dice "el más nuevo", server dice lo contrario.
+      { _id: 'a', tipo: 'venta', timestamp: 9999, _serverTs: { toMillis: () => 1000 } },
+      { _id: 'b', tipo: 'venta', timestamp: 1, _serverTs: { toMillis: () => 3000 } },
+      { _id: 'c', tipo: 'venta', timestamp: 5, _serverTs: { toMillis: () => 2000 } },
+    ]);
+    const audit = createAuditLog(deps);
+    const out = await audit.consultar();
+    expect(out.map(r => r._id)).toEqual(['b', 'c', 'a']);
+  });
+
+  it('docs sin _serverTs caen al timestamp cliente (fallback)', async () => {
+    const { deps, mock } = makeDeps();
+    mock.setDocs([
+      { _id: 'viejo', tipo: 'venta', timestamp: 100 },
+      { _id: 'nuevo', tipo: 'venta', timestamp: 200 },
+      { _id: 'server', tipo: 'venta', timestamp: 1, _serverTs: { toMillis: () => 150 } },
+    ]);
+    const audit = createAuditLog(deps);
+    const out = await audit.consultar();
+    expect(out.map(r => r._id)).toEqual(['nuevo', 'server', 'viejo']);
   });
 });
