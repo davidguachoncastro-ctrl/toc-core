@@ -24,6 +24,7 @@ const sourceCode = [
   loadCore('tenant-resolver.js'),
   loadCore('iva.js'),
   loadCore('audit-log.js'),
+  loadCore('slug.js'),
 ].join('\n');
 
 // eslint-disable-next-line no-new-func
@@ -49,6 +50,8 @@ const exposeAll = new Function(`
     createAuditLog,
     AUDIT_TIPOS,
     AUDIT_UMBRAL_DESCUENTO_PCT,
+    // slug (#10)
+    slugCatalogo,
   };
 `);
 
@@ -70,4 +73,5 @@ export const {
   createAuditLog,
   AUDIT_TIPOS,
   AUDIT_UMBRAL_DESCUENTO_PCT,
+  slugCatalogo,
 } = core;
