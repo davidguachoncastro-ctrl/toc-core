@@ -109,6 +109,7 @@ describe('Constantes públicas', () => {
     expect(AUDIT_TIPOS.EDIT_CARTA).toBe('edit_carta');
     expect(AUDIT_TIPOS.VENTA_SIN_ESCANDALLO).toBe('venta_sin_escandallo');
     expect(AUDIT_TIPOS.CAJON_MANUAL).toBe('cajon_manual');
+    expect(AUDIT_TIPOS.CAJA_MOV_DESCARTADO).toBe('caja_mov_descartado');
   });
 
   it('venta_sin_escandallo se acepta como tipo válido en escribir()', async () => {
@@ -133,6 +134,17 @@ describe('Constantes públicas', () => {
     expect(mock.adds[0].data.tipo).toBe('cajon_manual');
     expect(mock.adds[0].data.motivo).toBe('Cambio para mesa 4');
     expect(mock.adds[0].data.payload.mesa).toBe(4);
+  });
+
+  it('caja_mov_descartado (#134) se acepta como tipo válido en escribir()', async () => {
+    const { deps, mock } = makeDeps();
+    const audit = createAuditLog(deps);
+    await audit.escribir('caja_mov_descartado', {
+      payload: { turno: 'T1', remoteTurno: 'T2', movs: { m_1: { importe: 50 } } },
+    });
+    expect(mock.adds).toHaveLength(1);
+    expect(mock.adds[0].data.tipo).toBe('caja_mov_descartado');
+    expect(mock.adds[0].data.payload.remoteTurno).toBe('T2');
   });
 });
 

@@ -22,6 +22,11 @@
 //   - venta_sin_escandallo  (cobro de producto sin escandallo en el contrato
 //                            vigente; la venta se cobra normal pero NO se
 //                            descuenta stock — David debe crear el escandallo)
+//   - caja_mov_descartado   (#134: un movimiento de caja replayado quedó STALE
+//                            —su turno ya se cerró/reseteó en otro terminal— y
+//                            se descartó por diseño; se registra para que el
+//                            dinero físicamente movido tenga rastro fiscal en
+//                            el arqueo, no un descuadre inexplicable)
 //
 // Estructura de cada entrada en Firestore:
 // {
@@ -58,6 +63,7 @@ const AUDIT_TIPOS = {
   EDIT_CARTA: 'edit_carta',
   VENTA_SIN_ESCANDALLO: 'venta_sin_escandallo',
   CAJON_MANUAL: 'cajon_manual',
+  CAJA_MOV_DESCARTADO: 'caja_mov_descartado',
 };
 
 const AUDIT_UMBRAL_DESCUENTO_PCT = 10;

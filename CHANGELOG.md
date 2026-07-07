@@ -5,6 +5,22 @@ una entrada aquí.
 
 El formato sigue [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/).
 
+## [Unreleased] — audit-log: tipo caja_mov_descartado (#134)
+
+**Fecha:** 7 julio 2026. 111 tests verdes (+1 en `audit-log.test.js`).
+Consumido por el TPV (`fix-cierre-z-multiterminal`) para dejar rastro fiscal
+de un movimiento de caja descartado por turno-stale (Codex H).
+
+### Added
+
+- **#134** nuevo tipo `CAJA_MOV_DESCARTADO` (`caja_mov_descartado`). Cuando un
+  `caja_upsert` replayado queda STALE —su turno ya se cerró/reseteó en otro
+  terminal— el descarte es correcto por diseño pero antes era invisible: el
+  dinero físicamente movido desaparecía sin rastro y en el arqueo salía como
+  descuadre inexplicable. El TPV registra ahora el descarte en `audit_log` con
+  este tipo. Las rules de `audit_log` solo exigen `tipo is string` (sin
+  whitelist) → no requiere cambio de rules.
+
 ## [Unreleased] — iva: IVA 0% exento + desglose TBAI-safe (#55/#72), tenant-resolver header (#85)
 
 **Fecha:** 1 julio 2026. 93 tests verdes (+5 en `iva.test.js`).
