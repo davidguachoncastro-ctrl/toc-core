@@ -188,6 +188,13 @@ function createAuditLog(deps) {
         });
       deps.log('[AUDIT] ✓ ' + tipo, datos);
     } catch (e) {
+      // #181: ALREADY_EXISTS = el write anterior SÍ llegó (el SDK reintentó
+      // un commit cuyo ack se perdió y el doc ya existe). El evento ya es
+      // durable → éxito: encolarlo duplicaría y reportarlo a Sentry es ruido.
+      if (e && e.code === 'already-exists') {
+        deps.log('[AUDIT] ✓ ' + tipo + ' (ya durable: ALREADY_EXISTS en retry del SDK)');
+        return;
+      }
       // #54: fallo de write ruidoso SIEMPRE (antes solo tocLog con
       // ?debug=1) + encolado para replay. Política "mejor duplicado que
       // perdido": si el write llegó al server pero el ack se perdió, el

@@ -429,6 +429,31 @@ describe('#54 — fallos ruidosos (logError)', () => {
     expect(sentryCalls.reportar).toHaveLength(1);
   });
 
+  it('#181: ALREADY_EXISTS en el write = ya durable → éxito (ni logError, ni Sentry, ni encolar)', async () => {
+    const errores = [];
+    const encolados = [];
+    const errAE = new Error('ALREADY_EXISTS: entity already exists');
+    errAE.code = 'already-exists';
+    const failingDb = {
+      collection: () => ({
+        doc: () => ({
+          collection: () => ({ add: () => Promise.reject(errAE) }),
+        }),
+      }),
+    };
+    const { deps, logs, sentryCalls } = makeDeps({
+      db: () => failingDb,
+      logError: (...args) => errores.push(args),
+      encolar: (e) => encolados.push(e),
+    });
+    const audit = createAuditLog(deps);
+    await audit.escribir('anulacion', { motivo: 'test' });
+    expect(errores).toHaveLength(0);
+    expect(sentryCalls.reportar).toHaveLength(0);
+    expect(encolados).toHaveLength(0);
+    expect(logs.some((l) => l.join(' ').includes('ya durable'))).toBe(true);
+  });
+
   it('sin logError inyectado cae a deps.log sin lanzar (compat BO/RRHH)', async () => {
     const { deps, logs } = makeDeps({ db: () => null });
     const audit = createAuditLog(deps);
