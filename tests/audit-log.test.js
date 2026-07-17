@@ -96,7 +96,7 @@ describe('Constantes públicas', () => {
     expect(AUDIT_UMBRAL_DESCUENTO_PCT).toBe(10);
   });
 
-  it('AUDIT_TIPOS contiene los 12 tipos acordados', () => {
+  it('AUDIT_TIPOS contiene los 14 tipos acordados', () => {
     expect(AUDIT_TIPOS.VENTA).toBe('venta');
     expect(AUDIT_TIPOS.ANULACION).toBe('anulacion');
     expect(AUDIT_TIPOS.ANULACION_VENTA).toBe('anulacion_venta');
@@ -110,6 +110,7 @@ describe('Constantes públicas', () => {
     expect(AUDIT_TIPOS.VENTA_SIN_ESCANDALLO).toBe('venta_sin_escandallo');
     expect(AUDIT_TIPOS.CAJON_MANUAL).toBe('cajon_manual');
     expect(AUDIT_TIPOS.CAJA_MOV_DESCARTADO).toBe('caja_mov_descartado');
+    expect(AUDIT_TIPOS.APERTURA_DESCARTADA).toBe('apertura_descartada');
   });
 
   it('venta_sin_escandallo se acepta como tipo válido en escribir()', async () => {

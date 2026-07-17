@@ -64,6 +64,10 @@ const AUDIT_TIPOS = {
   VENTA_SIN_ESCANDALLO: 'venta_sin_escandallo',
   CAJON_MANUAL: 'cajon_manual',
   CAJA_MOV_DESCARTADO: 'caja_mov_descartado',
+  // #201: apertura de caja perdedora de una carrera multi-terminal — su
+  // caja_reset se descartó contra un turno más nuevo. Simetría con
+  // CAJA_MOV_DESCARTADO: el descarte es correcto, pero debe dejar rastro.
+  APERTURA_DESCARTADA: 'apertura_descartada',
 };
 
 const AUDIT_UMBRAL_DESCUENTO_PCT = 10;
