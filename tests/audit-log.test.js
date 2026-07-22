@@ -96,7 +96,7 @@ describe('Constantes públicas', () => {
     expect(AUDIT_UMBRAL_DESCUENTO_PCT).toBe(10);
   });
 
-  it('AUDIT_TIPOS contiene los 14 tipos acordados', () => {
+  it('AUDIT_TIPOS contiene los 16 tipos acordados', () => {
     expect(AUDIT_TIPOS.VENTA).toBe('venta');
     expect(AUDIT_TIPOS.ANULACION).toBe('anulacion');
     expect(AUDIT_TIPOS.ANULACION_VENTA).toBe('anulacion_venta');
@@ -111,6 +111,8 @@ describe('Constantes públicas', () => {
     expect(AUDIT_TIPOS.CAJON_MANUAL).toBe('cajon_manual');
     expect(AUDIT_TIPOS.CAJA_MOV_DESCARTADO).toBe('caja_mov_descartado');
     expect(AUDIT_TIPOS.APERTURA_DESCARTADA).toBe('apertura_descartada');
+    expect(AUDIT_TIPOS.NUMERO_ANULADO).toBe('numero_anulado');
+    expect(AUDIT_TIPOS.VENTA_COLISION).toBe('venta_colision');
   });
 
   it('venta_sin_escandallo se acepta como tipo válido en escribir()', async () => {
@@ -146,6 +148,29 @@ describe('Constantes públicas', () => {
     expect(mock.adds).toHaveLength(1);
     expect(mock.adds[0].data.tipo).toBe('caja_mov_descartado');
     expect(mock.adds[0].data.payload.remoteTurno).toBe('T2');
+  });
+
+  it('numero_anulado (#207) se acepta como tipo válido en escribir()', async () => {
+    const { deps, mock } = makeDeps();
+    const audit = createAuditLog(deps);
+    await audit.escribir('numero_anulado', {
+      motivo: 'firestore down',
+      payload: { numTicket: 'A-0042' },
+    });
+    expect(mock.adds).toHaveLength(1);
+    expect(mock.adds[0].data.tipo).toBe('numero_anulado');
+    expect(mock.adds[0].data.payload.numTicket).toBe('A-0042');
+  });
+
+  it('venta_colision (#198) se acepta como tipo válido en escribir()', async () => {
+    const { deps, mock } = makeDeps();
+    const audit = createAuditLog(deps);
+    await audit.escribir('venta_colision', {
+      payload: { ventaId: 'v-9', campos: ['total'] },
+    });
+    expect(mock.adds).toHaveLength(1);
+    expect(mock.adds[0].data.tipo).toBe('venta_colision');
+    expect(mock.adds[0].data.payload.campos).toEqual(['total']);
   });
 });
 
@@ -531,6 +556,42 @@ describe('#54 — durabilidad (encolar)', () => {
     const audit = createAuditLog(deps);
     await expect(audit.escribir('venta', {})).resolves.toBeUndefined();
     expect(errores.some(l => l.join(' ').includes('PERDIDO'))).toBe(true);
+  });
+});
+
+describe('#210 — secuencia por dispositivo (deps.secuencia)', () => {
+  it('inyectada: la entrada incluye auditSeq, auditSeqEpoch y deviceId', async () => {
+    const { deps, mock } = makeDeps({
+      secuencia: () => ({ seq: 7, epoch: 'e-abc', deviceId: 'device_1' }),
+    });
+    const audit = createAuditLog(deps);
+    await audit.escribir('venta', { importe: 10 });
+    expect(mock.adds[0].data.auditSeq).toBe(7);
+    expect(mock.adds[0].data.auditSeqEpoch).toBe('e-abc');
+    expect(mock.adds[0].data.deviceId).toBe('device_1');
+  });
+
+  it('no inyectada (BO/RRHH): el shape no cambia — sin campos de secuencia', async () => {
+    const { deps, mock } = makeDeps();
+    const audit = createAuditLog(deps);
+    await audit.escribir('venta', {});
+    expect('auditSeq' in mock.adds[0].data).toBe(false);
+    expect('auditSeqEpoch' in mock.adds[0].data).toBe(false);
+    expect('deviceId' in mock.adds[0].data).toBe(false);
+  });
+
+  it('getter que lanza o devuelve seq no finito: el evento se escribe igual sin secuencia', async () => {
+    const { deps, mock } = makeDeps({ secuencia: () => { throw new Error('boom'); } });
+    const audit = createAuditLog(deps);
+    await audit.escribir('venta', {});
+    expect(mock.adds).toHaveLength(1);
+    expect('auditSeq' in mock.adds[0].data).toBe(false);
+
+    const malformada = makeDeps({ secuencia: () => ({ seq: 'x', epoch: 'e' }) });
+    const audit2 = createAuditLog(malformada.deps);
+    await audit2.escribir('venta', {});
+    expect(malformada.mock.adds).toHaveLength(1);
+    expect('auditSeq' in malformada.mock.adds[0].data).toBe(false);
   });
 });
 

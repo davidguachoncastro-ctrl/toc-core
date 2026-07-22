@@ -68,6 +68,14 @@ const AUDIT_TIPOS = {
   // caja_reset se descartó contra un turno más nuevo. Simetría con
   // CAJA_MOV_DESCARTADO: el descarte es correcto, pero debe dejar rastro.
   APERTURA_DESCARTADA: 'apertura_descartada',
+  // #207: hueco de correlativo justificado — un número reservado se anuló
+  // (venta no persistida). Réplica durable del registro local
+  // toc-numeros-anulados, que vive solo en localStorage del terminal.
+  NUMERO_ANULADO: 'numero_anulado',
+  // #198: llegó una venta con id ya existente y payload DISTINTO. El
+  // handler no pisa nada (create-only), pero el descarte debe dejar
+  // rastro en vez de tragarse en silencio.
+  VENTA_COLISION: 'venta_colision',
 };
 
 const AUDIT_UMBRAL_DESCUENTO_PCT = 10;
@@ -92,6 +100,12 @@ const AUDIT_UMBRAL_DESCUENTO_PCT = 10;
  *                                              aquí (cola offline del consumidor) en vez de
  *                                              perderse. Política: mejor duplicado que perdido —
  *                                              audit_log es append-only y deduplicable a posteriori.
+ * @param {() => {seq:number, epoch:string, deviceId:(string|null)}} [deps.secuencia]
+ *                                            - #210: getter de secuencia monotónica por
+ *                                              dispositivo (tenant+deviceId). Si se inyecta y
+ *                                              devuelve un seq finito, la entrada incluye
+ *                                              auditSeq/auditSeqEpoch/deviceId; si no, el
+ *                                              shape no cambia (compat BO/RRHH).
  * @param {Object} [deps.sentry]              - Hooks Sentry (opcional).
  * @param {(msg, cat, data) => void} [deps.sentry.breadcrumb]
  * @param {(err, ctx) => void} [deps.sentry.reportar]
@@ -145,6 +159,16 @@ function createAuditLog(deps) {
         auth = { uid: (a && a.uid) || null, email: (a && a.email) || null };
       } catch (_) { auth = null; }
     }
+    // #210: secuencia monotónica por dispositivo para orden total
+    // reconstruible y huecos detectables. Un fallo del getter nunca
+    // bloquea el evento (la secuencia es metadato, el evento es fiscal).
+    let secuencia = null;
+    if (typeof deps.secuencia === 'function') {
+      try {
+        const s = deps.secuencia();
+        if (s && Number.isFinite(s.seq)) secuencia = s;
+      } catch (_) { secuencia = null; }
+    }
     const entrada = {
       tipo,
       timestamp: Date.now(),
@@ -156,6 +180,13 @@ function createAuditLog(deps) {
         rol: (usuario && usuario.rol) || '-',
       },
       auth,
+      ...(secuencia
+        ? {
+            auditSeq: secuencia.seq,
+            auditSeqEpoch: secuencia.epoch != null ? secuencia.epoch : null,
+            deviceId: secuencia.deviceId != null ? secuencia.deviceId : null,
+          }
+        : {}),
       ...datos,
     };
 
